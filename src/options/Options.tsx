@@ -287,7 +287,7 @@ export default function Options() {
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(8,8,8,0.76)' }} />
       </div>
 
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: viewMode === 'grid' ? '900px' : '600px', margin: '0 auto', padding: '52px 40px 80px' }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: viewMode === 'grid' ? '900px' : '600px', margin: '0 auto', padding: '52px 40px 80px', background: 'rgba(10,10,10,0.4)', minHeight: '100vh' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -317,7 +317,7 @@ export default function Options() {
             ← Back
           </button>
         </div>
-        <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: '24px' }}>Goals</h1>
+        <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: '24px', color: '#ffffff' }}>Goals</h1>
 
         {/* Goal sections */}
         {sections.map(({ key, label, values, setter }) => (

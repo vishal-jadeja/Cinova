@@ -4,6 +4,16 @@ import { getStore, setStore } from '../utils/storage';
 import logoMark from '/CinovaLogo.png';
 
 const FONT_SANS = "'Space Grotesk', sans-serif";
+const BG_URLS = [
+  'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=60',
+  'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=400&q=60',
+  'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?auto=format&fit=crop&w=400&q=60',
+  'https://images.unsplash.com/photo-1509316785289-025f5b846b35?auto=format&fit=crop&w=400&q=60',
+  'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=400&q=60',
+  'https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&fit=crop&w=400&q=60',
+  'https://images.unsplash.com/photo-1439853949212-36089c9a8957?auto=format&fit=crop&w=400&q=60',
+  'https://images.unsplash.com/photo-1418985991508-e47386d96a71?auto=format&fit=crop&w=400&q=60',
+];
 const BG_URL = 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1920&q=80';
 
 const T = {
@@ -69,7 +79,7 @@ export default function Settings() {
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(8,8,8,0.76)' }} />
       </div>
 
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: '600px', margin: '0 auto', padding: '52px 40px 80px' }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: '600px', margin: '0 auto', padding: '52px 40px 80px', background: 'rgba(10,10,10,0.4)', minHeight: '100vh' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -82,10 +92,10 @@ export default function Settings() {
           </button>
         </div>
 
-        <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: '32px' }}>Settings</h1>
+        <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: '32px', color: '#ffffff' }}>Settings</h1>
 
         {/* Background image */}
-        <div style={{ padding: '22px 24px', border: `1px solid ${T.border}`, borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+        <div style={{ padding: '22px 24px', border: `1px solid ${T.border}`, borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', background: T.surface }}>
           <div style={{ fontSize: '13px', fontWeight: 600, letterSpacing: '0.01em' }}>Background image</div>
           <div style={{ fontSize: '13px', color: T.muted, lineHeight: 1.55 }}>Paste any image URL. The blur is applied automatically.</div>
           <input
@@ -108,7 +118,7 @@ export default function Settings() {
         </div>
 
         {/* Auto-change weekly */}
-        <div style={{ padding: '22px 24px', border: `1px solid ${T.border}`, borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+        <div style={{ padding: '22px 24px', border: `1px solid ${T.border}`, borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', background: T.surface }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
             <div>
               <div style={{ fontSize: '13px', fontWeight: 600, letterSpacing: '0.01em', marginBottom: '4px' }}>Auto-change background weekly</div>
@@ -127,6 +137,18 @@ export default function Settings() {
               <div style={{ position: 'absolute', top: '3px', left: autoBackground ? '23px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: autoBackground ? T.accentText : T.text, transition: 'left 200ms', opacity: autoBackground ? 1 : 0.7 }} />
             </div>
           </div>
+          {/* Thumbnail preview strip */}
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginTop: '4px', msOverflowStyle: 'none', scrollbarWidth: 'none' } as React.CSSProperties}>
+            {BG_URLS.map((url, i) => (
+              <div key={i} style={{
+                flexShrink: 0, width: '96px', height: '64px', borderRadius: '4px',
+                backgroundImage: `url('${url}')`, backgroundSize: 'cover', backgroundPosition: 'center',
+                outline: autoBackground && store.backgroundIndex === i ? `2px solid ${T.amber}` : `1px solid ${T.border}`,
+                outlineOffset: autoBackground && store.backgroundIndex === i ? '2px' : '0px',
+                transition: 'outline 200ms, outline-offset 200ms',
+              }} />
+            ))}
+          </div>
         </div>
 
         {/* Divider */}
@@ -144,7 +166,7 @@ export default function Settings() {
         </div>
 
         {/* Reset weekly */}
-        <div style={{ padding: '22px 24px', border: `1px solid ${T.border}`, borderRadius: '6px', display: 'inline-flex', flexDirection: 'column', gap: '8px', minWidth: '320px' }}>
+        <div style={{ padding: '22px 24px', border: `1px solid ${T.border}`, borderRadius: '6px', display: 'inline-flex', flexDirection: 'column', gap: '8px', minWidth: '320px', background: T.surface }}>
           <div style={{ fontSize: '13px', fontWeight: 600, letterSpacing: '0.01em' }}>Reset weekly progress</div>
           <div style={{ fontSize: '13px', color: T.muted, lineHeight: 1.55 }}>Unchecks all weekly goals without deleting them.</div>
           <button onClick={handleResetWeekly}
