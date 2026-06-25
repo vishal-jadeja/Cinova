@@ -4,62 +4,34 @@ import { Goal, GoalStore } from '../types';
 import { getStore, setStore } from '../utils/storage';
 
 const MAX_GOALS = 10;
-const MAX_LINKS = 5;
-const BG_IMG = 'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=1920&q=80';
-
-interface LinkDraft {
-  id: string;
-  url: string;
-  label: string;
-}
 
 interface GoalDraft {
   id: string;
   text: string;
   completed: boolean;
   description: string;
-  links: LinkDraft[];
 }
 
 type Setter = React.Dispatch<React.SetStateAction<GoalDraft[]>>;
 
 function emptyDraft(): GoalDraft {
-  return { id: crypto.randomUUID(), text: '', completed: false, description: '', links: [] };
+  return { id: crypto.randomUUID(), text: '', completed: false, description: '' };
 }
 
 function draftsFromGoals(goals: Goal[]): GoalDraft[] {
   const result = goals.map((g) => ({
-    id: g.id,
-    text: g.text,
-    completed: g.completed,
-    description: g.description ?? '',
-    links: (g.links ?? []).map((l) => ({ ...l })),
+    id: g.id, text: g.text, completed: g.completed, description: g.description ?? '',
   }));
   return result.length > 0 ? result : [emptyDraft()];
 }
 
-function normalizeUrl(url: string): string {
-  if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
-    return 'https://' + url;
-  }
-  return url;
-}
-
 function buildGoals(drafts: GoalDraft[]): Goal[] {
-  return drafts
-    .filter((d) => d.text.trim())
-    .map((d) => {
-      const validLinks = d.links
-        .filter((l) => l.url.trim())
-        .map((l) => ({ id: l.id, url: normalizeUrl(l.url.trim()), label: l.label.trim() || l.url.trim() }));
-      return {
-        id: d.id,
-        text: d.text.trim(),
-        completed: d.completed,
-        ...(d.description.trim() ? { description: d.description.trim() } : {}),
-        ...(validLinks.length > 0 ? { links: validLinks } : {}),
-      };
-    });
+  return drafts.filter((d) => d.text.trim()).map((d) => ({
+    id: d.id,
+    text: d.text.trim(),
+    completed: d.completed,
+    ...(d.description.trim() ? { description: d.description.trim() } : {}),
+  }));
 }
 
 const CATEGORIES = [
@@ -69,22 +41,9 @@ const CATEGORIES = [
 ];
 
 const inputBase: React.CSSProperties = {
-  background: '#13161F',
-  border: '1px solid #1E2130',
-  color: '#E8EAF0',
-  fontSize: '14px',
-  padding: '11px 14px',
-  borderRadius: '4px',
-  outline: 'none',
-  fontFamily: 'Inter, sans-serif',
-  transition: 'border-color 150ms',
-  width: '100%',
-};
-
-const inputSm: React.CSSProperties = {
-  ...inputBase,
-  fontSize: '12px',
-  padding: '8px 12px',
+  background: '#13161F', border: '1px solid #1E2130', color: '#E8EAF0',
+  fontSize: '14px', padding: '11px 14px', borderRadius: '4px', outline: 'none',
+  fontFamily: 'Inter, sans-serif', transition: 'border-color 150ms', width: '100%',
 };
 
 export default function Options() {
@@ -98,9 +57,15 @@ export default function Options() {
   useEffect(() => {
     getStore().then((s) => {
       setLocalStore(s);
-      setWeekly(draftsFromGoals(s.weekly));
-      setMonthly(draftsFromGoals(s.monthly));
-      setYearly(draftsFromGoals(s.yearly));
+      const w = draftsFromGoals(s.weekly);
+      const mo = draftsFromGoals(s.monthly);
+      const y = draftsFromGoals(s.yearly);
+      setWeekly(w);
+      setMonthly(mo);
+      setYearly(y);
+      // Auto-expand goals that already have description content
+      const withContent = new Set([...w, ...mo, ...y].filter((d) => d.description.trim()).map((d) => d.id));
+      setExpanded(withContent);
     });
   }, []);
 
@@ -117,24 +82,15 @@ export default function Options() {
   }
 
   function addDraft(setter: Setter) {
-    setter((prev) => [...prev, emptyDraft()]);
+    const draft = emptyDraft();
+    setter((prev) => [...prev, draft]);
+    // Auto-open description panel on new goal
+    setExpanded((prev) => new Set([...prev, draft.id]));
   }
 
   function removeDraft(setter: Setter, id: string) {
     setter((prev) => { const next = prev.filter((d) => d.id !== id); return next.length === 0 ? [emptyDraft()] : next; });
     setExpanded((prev) => { const next = new Set(prev); next.delete(id); return next; });
-  }
-
-  function addLink(setter: Setter, goalId: string) {
-    setter((prev) => prev.map((d) => d.id === goalId ? { ...d, links: [...d.links, { id: crypto.randomUUID(), url: '', label: '' }] } : d));
-  }
-
-  function removeLink(setter: Setter, goalId: string, linkId: string) {
-    setter((prev) => prev.map((d) => d.id === goalId ? { ...d, links: d.links.filter((l) => l.id !== linkId) } : d));
-  }
-
-  function updateLink(setter: Setter, goalId: string, linkId: string, patch: { url?: string; label?: string }) {
-    setter((prev) => prev.map((d) => d.id === goalId ? { ...d, links: d.links.map((l) => (l.id === linkId ? { ...l, ...patch } : l)) } : d));
   }
 
   async function handleSave() {
@@ -163,7 +119,7 @@ export default function Options() {
   if (!store) {
     return (
       <div style={{ minHeight: '100vh', background: '#0C0E14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ width: '16px', height: '16px', border: '1.5px solid #E8A838', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        <div style={{ width: '16px', height: '16px', border: '1.5px solid #E8A838', borderTopColor: 'transparent', borderRadius: '50%' }} />
       </div>
     );
   }
@@ -176,13 +132,16 @@ export default function Options() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0C0E14', color: '#E8EAF0', position: 'relative', overflow: 'hidden' }}>
-      {/* Bg blur */}
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <img src={BG_IMG} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(64px) saturate(0.55)', opacity: 0.18, transform: 'scale(1.12)' }} />
-      </div>
+      {/* Atmospheric gradient background */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
+        background: `
+          radial-gradient(ellipse 130% 55% at 50% -5%, rgba(72,32,160,0.10) 0%, transparent 60%),
+          radial-gradient(ellipse 70% 55% at 88% 92%, rgba(16,76,156,0.08) 0%, transparent 55%)
+        `,
+      }} />
 
       <div style={{ maxWidth: '640px', margin: '0 auto', padding: '48px 40px', position: 'relative', zIndex: 1 }}>
-        {/* Title */}
         <div style={{ marginBottom: '28px' }}>
           <h1 style={{ fontFamily: 'Inter, sans-serif', fontSize: '22px', fontWeight: 700, color: '#E8EAF0', letterSpacing: '-0.01em', margin: '0 0 5px' }}>Cinova</h1>
           <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', color: '#5A6080', margin: 0 }}>Your goals. Every tab.</p>
@@ -201,11 +160,9 @@ export default function Options() {
                   {label}
                 </span>
                 {note && (
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', color: '#5A6080', letterSpacing: '0.06em' }}>
-                    ({note})
-                  </span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '9px', color: '#5A6080', letterSpacing: '0.06em' }}>({note})</span>
                 )}
-                <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', color: '#5A6080', marginLeft: 'auto', opacity: 0.5 }}>
+                <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', color: '#5A6080', marginLeft: 'auto', opacity: 0.4 }}>
                   {values.filter((d) => d.text.trim()).length}/{MAX_GOALS}
                 </span>
               </div>
@@ -213,11 +170,11 @@ export default function Options() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {values.map((draft, i) => {
                   const isExpanded = expanded.has(draft.id);
-                  const hasContent = draft.description.trim() || draft.links.some((l) => l.url.trim());
+                  const hasContent = draft.description.trim().length > 0;
 
                   return (
                     <div key={draft.id} style={{ border: '1px solid #1E2130', borderRadius: '4px', overflow: 'hidden' }}>
-                      {/* Goal row */}
+                      {/* Goal text row */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#13161F', padding: '0 12px' }}>
                         <input
                           type="text"
@@ -226,23 +183,22 @@ export default function Options() {
                           placeholder={`Goal ${i + 1}`}
                           style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#E8EAF0', fontSize: '14px', padding: '11px 0', fontFamily: 'Inter, sans-serif' }}
                         />
-                        <button type="button" onClick={() => toggleExpanded(draft.id)}
+                        {/* Description toggle — accent when has content */}
+                        <button
+                          type="button"
+                          onClick={() => toggleExpanded(draft.id)}
                           style={{
-                            flexShrink: 0,
-                            display: 'flex', alignItems: 'center', gap: '4px',
+                            flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
                             background: 'none', border: 'none', cursor: 'pointer',
-                            color: isExpanded ? '#E8A838' : hasContent ? '#E8A838' : '#5A6080',
-                            opacity: isExpanded || hasContent ? 1 : 0.6,
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: '10px', letterSpacing: '0.06em',
-                            padding: '4px 6px',
-                            transition: 'color 150ms, opacity 150ms',
+                            color: hasContent ? '#E8A838' : '#5A6080',
+                            fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', letterSpacing: '0.06em',
+                            padding: '4px 6px', transition: 'color 150ms',
                           }}
-                          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#E8A838'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.opacity = isExpanded || hasContent ? '1' : '0.6'; e.currentTarget.style.color = isExpanded ? '#E8A838' : hasContent ? '#E8A838' : '#5A6080'; }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = '#E8A838')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = hasContent ? '#E8A838' : '#5A6080')}
                         >
                           {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                          Details
+                          {isExpanded ? 'Notes' : hasContent ? 'Notes' : 'Notes'}
                         </button>
                         {values.length > 1 && (
                           <button type="button" onClick={() => removeDraft(setter, draft.id)}
@@ -254,70 +210,19 @@ export default function Options() {
                         )}
                       </div>
 
-                      {/* Detail panel */}
+                      {/* Description panel — links typed inline, URLs linkified on display */}
                       {isExpanded && (
-                        <div style={{ padding: '16px', borderTop: '1px solid #1E2130', background: 'rgba(255,255,255,0.015)' }}>
-                          {/* Description */}
-                          <div style={{ marginBottom: '16px' }}>
-                            <label style={{ display: 'block', fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#5A6080', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '8px' }}>
-                              Description
-                            </label>
-                            <textarea
-                              value={draft.description}
-                              onChange={(e) => updateDraft(setter, draft.id, { description: e.target.value })}
-                              placeholder="Optional context, notes, or motivation…"
-                              rows={3}
-                              style={{ ...inputBase, resize: 'none', borderRadius: '4px' }}
-                              onFocus={(e) => (e.currentTarget.style.borderColor = '#E8A838')}
-                              onBlur={(e) => (e.currentTarget.style.borderColor = '#1E2130')}
-                            />
-                          </div>
-                          {/* Links */}
-                          <div>
-                            <label style={{ display: 'block', fontFamily: "'JetBrains Mono', monospace", fontSize: '10px', color: '#5A6080', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '8px' }}>
-                              Links
-                            </label>
-                            {draft.links.length > 0 && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
-                                {draft.links.map((link) => (
-                                  <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <input type="text" value={link.url}
-                                      onChange={(e) => updateLink(setter, draft.id, link.id, { url: e.target.value })}
-                                      placeholder="https://…"
-                                      style={{ ...inputSm, flex: 1 }}
-                                      onFocus={(e) => (e.currentTarget.style.borderColor = '#E8A838')}
-                                      onBlur={(e) => (e.currentTarget.style.borderColor = '#1E2130')}
-                                    />
-                                    <input type="text" value={link.label}
-                                      onChange={(e) => updateLink(setter, draft.id, link.id, { label: e.target.value })}
-                                      placeholder="Label (optional)"
-                                      style={{ ...inputSm, width: '140px' }}
-                                      onFocus={(e) => (e.currentTarget.style.borderColor = '#E8A838')}
-                                      onBlur={(e) => (e.currentTarget.style.borderColor = '#1E2130')}
-                                    />
-                                    <button type="button" onClick={() => removeLink(setter, draft.id, link.id)}
-                                      style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: '#5A6080', padding: '4px', display: 'flex', transition: 'color 150ms' }}
-                                      onMouseEnter={(e) => (e.currentTarget.style.color = '#E05A5A')}
-                                      onMouseLeave={(e) => (e.currentTarget.style.color = '#5A6080')}>
-                                      <X size={12} />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {draft.links.length < MAX_LINKS ? (
-                              <button type="button" onClick={() => addLink(setter, draft.id)}
-                                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#5A6080', padding: 0, fontFamily: 'Inter, sans-serif', fontSize: '12px', transition: 'color 150ms' }}
-                                onMouseEnter={(e) => (e.currentTarget.style.color = '#E8A838')}
-                                onMouseLeave={(e) => (e.currentTarget.style.color = '#5A6080')}>
-                                <Plus size={12} /> Add link
-                              </button>
-                            ) : (
-                              <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', color: '#5A6080', opacity: 0.5, margin: 0 }}>
-                                Maximum {MAX_LINKS} links per goal
-                              </p>
-                            )}
-                          </div>
+                        <div style={{ padding: '14px 16px', borderTop: '1px solid #1E2130', background: 'rgba(255,255,255,0.015)' }}>
+                          <textarea
+                            value={draft.description}
+                            onChange={(e) => updateDraft(setter, draft.id, { description: e.target.value })}
+                            placeholder="Notes, context, or paste links — URLs become clickable on your new tab"
+                            rows={3}
+                            style={{ ...inputBase, resize: 'vertical', borderRadius: '4px', fontSize: '13px', lineHeight: 1.6, padding: '10px 12px' }}
+                            onFocus={(e) => (e.currentTarget.style.borderColor = '#E8A838')}
+                            onBlur={(e) => (e.currentTarget.style.borderColor = '#1E2130')}
+                            autoFocus
+                          />
                         </div>
                       )}
                     </div>
@@ -372,18 +277,9 @@ export default function Options() {
         </div>
       </div>
 
-      {/* Toast — design spec */}
+      {/* Toast */}
       {toast && (
-        <div style={{
-          position: 'fixed', bottom: '20px', right: '20px',
-          background: '#13161F',
-          border: '1px solid #1E2130',
-          padding: '10px 16px',
-          borderRadius: '6px',
-          display: 'flex', alignItems: 'center', gap: '8px',
-          pointerEvents: 'none',
-          zIndex: 50,
-        }}>
+        <div style={{ position: 'fixed', bottom: '20px', right: '20px', background: '#13161F', border: '1px solid #1E2130', padding: '10px 16px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'none', zIndex: 50 }}>
           <span style={{ color: '#4CAF82', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', lineHeight: 1 }}>✓</span>
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: '#E8EAF0', letterSpacing: '0.06em' }}>
             {toast === 'saved' ? 'Goals saved' : 'Progress reset'}
