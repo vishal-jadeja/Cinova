@@ -232,6 +232,8 @@ export default function Options() {
   const [yearly, setYearly] = useState<GoalDraft[]>([emptyDraft()]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [savedVisible, setSavedVisible] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() =>
     (localStorage.getItem('cinova-options-view') as 'grid' | 'list') ?? 'grid'
   );
@@ -263,9 +265,12 @@ export default function Options() {
     };
     await setStore(newStore);
     setLocalStore(newStore);
+    setIsDirty(false);
     setSavedVisible(true);
     setTimeout(() => setSavedVisible(false), 2500);
   }
+
+  const navigateBack = () => { window.location.href = chrome.runtime.getURL('src/newtab/index.html'); };
 
   if (!store) {
     return (
@@ -276,13 +281,38 @@ export default function Options() {
   }
 
   const sections = [
-    { key: 'weekly' as const, label: 'This Week', values: weekly, setter: setWeekly },
-    { key: 'monthly' as const, label: 'This Month', values: monthly, setter: setMonthly },
-    { key: 'yearly' as const, label: 'This Year', values: yearly, setter: setYearly },
+    { key: 'weekly' as const, label: 'This Week', values: weekly, setter: (v: React.SetStateAction<GoalDraft[]>) => { setWeekly(v); setIsDirty(true); } },
+    { key: 'monthly' as const, label: 'This Month', values: monthly, setter: (v: React.SetStateAction<GoalDraft[]>) => { setMonthly(v); setIsDirty(true); } },
+    { key: 'yearly' as const, label: 'This Year', values: yearly, setter: (v: React.SetStateAction<GoalDraft[]>) => { setYearly(v); setIsDirty(true); } },
   ];
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', color: T.text, fontFamily: FONT_SANS, overflowY: 'auto', background: 'rgba(10,10,10,0.18)' }}>
+
+      {/* Leave modal */}
+      {showLeaveModal && (
+        <div onClick={() => setShowLeaveModal(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'rgba(18,18,18,0.95)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid ${T.border2}`, borderRadius: '12px', padding: '32px 36px', width: '440px', display: 'flex', flexDirection: 'column', gap: '14px', animation: 'fadeIn 0.15s ease-out' }}>
+            <div style={{ fontSize: '17px', fontWeight: 700, color: '#ffffff' }}>Unsaved changes</div>
+            <div style={{ fontSize: '13px', color: T.muted, lineHeight: 1.65 }}>Your goals haven't been saved yet. What would you like to do?</div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+              <button onClick={navigateBack}
+                style={{ background: 'none', border: `1px solid ${T.border2}`, color: T.muted, padding: '10px 18px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.06em', borderRadius: '5px', cursor: 'pointer', fontFamily: FONT_SANS, transition: 'border-color 150ms, color 150ms' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(232,232,232,0.3)'; e.currentTarget.style.color = T.text; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = T.border2; e.currentTarget.style.color = T.muted; }}>
+                Discard & leave
+              </button>
+              <button onClick={async () => { setShowLeaveModal(false); await handleSave(); navigateBack(); }}
+                style={{ background: '#e8e8e8', color: '#0d0d0d', border: 'none', padding: '10px 22px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', borderRadius: '5px', cursor: 'pointer', fontFamily: FONT_SANS }}>
+                Save changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Background */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden' }}>
         <div style={{ position: 'absolute', inset: '-40px', backgroundImage: `url('${BG_URL}')`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(34px)' }} />
@@ -312,7 +342,7 @@ export default function Options() {
               </svg>
             )}
           </button>
-          <button onClick={() => { window.location.href = chrome.runtime.getURL('src/newtab/index.html'); }}
+          <button onClick={() => { if (isDirty) { setShowLeaveModal(true); } else { navigateBack(); } }}
             style={{ background: 'none', border: `1px solid ${T.border2}`, padding: '8px 16px', fontSize: '11px', color: T.muted, letterSpacing: '0.06em', borderRadius: '4px', fontWeight: 500, cursor: 'pointer', fontFamily: FONT_SANS, transition: 'opacity 150ms, border-color 150ms' }}
             onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(232,232,232,0.3)')}
             onMouseLeave={e => (e.currentTarget.style.borderColor = T.border2)}>

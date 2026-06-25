@@ -302,19 +302,6 @@ function urlLabel(url: string): string {
   catch { return url; }
 }
 
-function parseDesc(text: string): Array<{ type: 'text' | 'url'; value: string }> {
-  const parts: Array<{ type: 'text' | 'url'; value: string }> = [];
-  const re = /https?:\/\/[^\s]+/g;
-  let last = 0, m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) parts.push({ type: 'text', value: text.slice(last, m.index) });
-    parts.push({ type: 'url', value: m[0] });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) parts.push({ type: 'text', value: text.slice(last) });
-  return parts;
-}
-
 function SidebarSection({ label, goals, onToggle }: { label: string; goals: Goal[]; onToggle: (id: string) => void }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const visible = goals.filter(g => g.text.trim());
@@ -323,10 +310,11 @@ function SidebarSection({ label, goals, onToggle }: { label: string; goals: Goal
     <div style={{ marginBottom: '26px' }}>
       <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.22em', fontWeight: 700, color: T.muted, marginBottom: '12px' }}>{label}</div>
       {visible.map(g => {
-        const desc = g.description?.trim() ?? '';
-        const hasDesc = desc.length > 0 && !g.completed;
+        const urls = g.description ? extractUrls(g.description) : [];
+        const descText = g.description ? g.description.replace(/https?:\/\/[^\s]+/g, '').trim() : '';
+        const hasDescText = descText.length > 0 && !g.completed;
+        const hasLinks = urls.length > 0 && !g.completed;
         const isExpanded = expandedId === g.id;
-        const segments = hasDesc && isExpanded ? parseDesc(desc) : [];
         return (
           <div key={g.id} onClick={() => onToggle(g.id)}
             style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '5px 8px', margin: '0 -8px', cursor: 'pointer', borderRadius: '4px', transition: 'background 150ms' }}
@@ -337,7 +325,7 @@ function SidebarSection({ label, goals, onToggle }: { label: string; goals: Goal
               <span style={{ display: 'block', fontSize: '12.5px', lineHeight: 1.42, opacity: g.completed ? 0.3 : 1, textDecoration: g.completed ? 'line-through' : 'none', transition: 'opacity 0.15s' }}>
                 {g.text}
               </span>
-              {hasDesc && (
+              {hasDescText && (
                 <div
                   onClick={e => { e.stopPropagation(); setExpandedId(isExpanded ? null : g.id); }}
                   style={{
@@ -350,19 +338,20 @@ function SidebarSection({ label, goals, onToggle }: { label: string; goals: Goal
                       ? { overflow: 'hidden', whiteSpace: 'nowrap' as const, textOverflow: 'ellipsis' }
                       : { whiteSpace: 'pre-wrap' as const, wordBreak: 'break-word' as const }),
                   }}>
-                  {isExpanded
-                    ? segments.map((seg, i) =>
-                        seg.type === 'url'
-                          ? <span key={i}
-                              onClick={e => { if (e.ctrlKey) { e.stopPropagation(); window.open(seg.value, '_blank'); } }}
-                              title="Ctrl+click to open"
-                              style={{ color: '#E8A838', opacity: 0.8, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
-                              {seg.value}
-                            </span>
-                          : <React.Fragment key={i}>{seg.value}</React.Fragment>
-                      )
-                    : desc
-                  }
+                  {descText}
+                </div>
+              )}
+              {hasLinks && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px', marginTop: '3px' }}>
+                  {urls.map(url => (
+                    <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      style={{ fontSize: '11px', color: '#E8A838', opacity: 0.75, textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}
+                      onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                      onMouseLeave={e => (e.currentTarget.style.opacity = '0.75')}>
+                      ↗ {urlLabel(url)}
+                    </a>
+                  ))}
                 </div>
               )}
             </div>

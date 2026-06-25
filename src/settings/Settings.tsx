@@ -11,6 +11,7 @@ const BG_URLS = [
   'https://images.unsplash.com/photo-1509316785289-025f5b846b35?auto=format&fit=crop&w=400&q=60',
   'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=400&q=60',
   'https://images.unsplash.com/photo-1501854140801-50d01698950b?auto=format&fit=crop&w=400&q=60',
+  'https://images.unsplash.com/photo-1439853949212-36089c9a8957?auto=format&fit=crop&w=400&q=60',
   'https://images.unsplash.com/photo-1418985991508-e47386d96a71?auto=format&fit=crop&w=400&q=60',
 ];
 const BG_URL = 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1920&q=80';
@@ -26,26 +27,25 @@ const T = {
   amber: '#E8A838',
 };
 
-type BarState = 'hidden' | 'dirty' | 'leaving' | 'saved';
-type Snapshot = { customBg: string; bgMode: 'custom' | 'auto'; selectedBgIndex: number | null };
+function getISOWeekKey(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${week}`;
+}
 
-const GHOST_BTN: React.CSSProperties = {
-  background: 'none', border: `1px solid rgba(232,232,232,0.14)`, color: 'rgba(232,232,232,0.36)',
-  padding: '8px 16px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.06em',
-  borderRadius: '4px', cursor: 'pointer', fontFamily: FONT_SANS, transition: 'border-color 150ms, color 150ms',
-};
-const PRIMARY_BTN: React.CSSProperties = {
-  background: '#e8e8e8', color: '#0d0d0d', border: 'none',
-  padding: '8px 20px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
-  borderRadius: '4px', cursor: 'pointer', fontFamily: FONT_SANS,
-};
+type Snapshot = { customBg: string; bgMode: 'custom' | 'auto'; selectedBgIndex: number | null };
 
 export default function Settings() {
   const [store, setLocalStore] = useState<GoalStore | null>(null);
   const [customBg, setCustomBg] = useState('');
   const [bgMode, setBgMode] = useState<'custom' | 'auto'>('auto');
   const [selectedBgIndex, setSelectedBgIndex] = useState<number | null>(null);
-  const [barState, setBarState] = useState<BarState>('hidden');
+  const [isDirty, setIsDirty] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [savedVisible, setSavedVisible] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
 
   useEffect(() => {
@@ -62,13 +62,6 @@ export default function Settings() {
     });
   }, []);
 
-  useEffect(() => {
-    if (barState !== 'dirty' && barState !== 'leaving') return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [barState]);
-
   const navigateBack = () => { window.location.href = chrome.runtime.getURL('src/newtab/index.html'); };
 
   async function handleSave() {
@@ -80,7 +73,11 @@ export default function Settings() {
       ...(bgMode === 'custom' && customBg.trim() ? { backgroundImage: customBg.trim() } : bgMode === 'custom' ? { backgroundImage: undefined } : {}),
       autoBackground: isAuto,
       ...(isAuto && selectedBgIndex !== null
-        ? { backgroundIndex: selectedBgIndex, lastBackgroundChange: undefined }
+        ? {
+            backgroundIndex: selectedBgIndex,
+            backgroundImage: BG_URLS[selectedBgIndex].replace('w=400&q=60', 'w=1920&q=80'),
+            lastBackgroundChange: getISOWeekKey(new Date()),
+          }
         : isAuto && wasAutoOff
           ? { backgroundIndex: undefined, lastBackgroundChange: undefined }
           : {}),
@@ -88,8 +85,9 @@ export default function Settings() {
     await setStore(newStore);
     setLocalStore(newStore);
     setSnapshot({ customBg: customBg.trim(), bgMode, selectedBgIndex });
-    setBarState('saved');
-    setTimeout(() => setBarState('hidden'), 1500);
+    setIsDirty(false);
+    setSavedVisible(true);
+    setTimeout(() => setSavedVisible(false), 2500);
   }
 
   function handleDiscard() {
@@ -98,12 +96,8 @@ export default function Settings() {
       setBgMode(snapshot.bgMode);
       setSelectedBgIndex(snapshot.selectedBgIndex);
     }
-    setBarState('hidden');
-  }
-
-  async function handleSaveAndGo() {
-    await handleSave();
-    navigateBack();
+    setIsDirty(false);
+    setShowLeaveModal(false);
   }
 
   async function handleResetWeekly() {
@@ -124,51 +118,29 @@ export default function Settings() {
   return (
     <div style={{ minHeight: '100vh', position: 'relative', color: T.text, fontFamily: FONT_SANS, overflowY: 'auto', background: 'rgba(10,10,10,0.18)' }}>
 
-      {/* Sticky save bar */}
-      <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
-        background: 'rgba(12,12,12,0.92)',
-        backdropFilter: 'blur(20px) saturate(1.3)',
-        WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
-        borderTop: `1px solid ${T.border2}`,
-        transform: barState === 'hidden' ? 'translateY(100%)' : 'translateY(0)',
-        transition: 'transform 260ms cubic-bezier(0.4,0,0.2,1)',
-      }}>
-        <div style={{ maxWidth: '880px', margin: '0 auto', padding: '14px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {barState === 'saved' && (
-            <span style={{ fontSize: '13px', color: T.amber, letterSpacing: '0.04em', fontWeight: 600 }}>✓ Changes saved</span>
-          )}
-          {barState === 'leaving' && (
-            <>
-              <span style={{ fontSize: '13px', color: T.text }}>Save before leaving?</span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={navigateBack} style={GHOST_BTN}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(232,232,232,0.3)'; e.currentTarget.style.color = T.text; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.border2; e.currentTarget.style.color = T.muted; }}>
-                  Leave anyway
-                </button>
-                <button onClick={handleSaveAndGo} style={PRIMARY_BTN}>Save & go</button>
-              </div>
-            </>
-          )}
-          {barState === 'dirty' && (
-            <>
-              <span style={{ fontSize: '13px', color: T.muted, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: T.amber, display: 'inline-block', flexShrink: 0 }} />
-                Unsaved changes
-              </span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={handleDiscard} style={GHOST_BTN}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(232,232,232,0.3)'; e.currentTarget.style.color = T.text; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.border2; e.currentTarget.style.color = T.muted; }}>
-                  Discard
-                </button>
-                <button onClick={handleSave} style={PRIMARY_BTN}>Save changes</button>
-              </div>
-            </>
-          )}
+      {/* Leave modal */}
+      {showLeaveModal && (
+        <div onClick={() => setShowLeaveModal(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'rgba(18,18,18,0.95)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: `1px solid ${T.border2}`, borderRadius: '12px', padding: '32px 36px', width: '440px', display: 'flex', flexDirection: 'column', gap: '14px', animation: 'fadeIn 0.15s ease-out' }}>
+            <div style={{ fontSize: '17px', fontWeight: 700, color: '#ffffff' }}>Unsaved changes</div>
+            <div style={{ fontSize: '13px', color: T.muted, lineHeight: 1.65 }}>You have unsaved changes to your settings. What would you like to do?</div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+              <button onClick={handleDiscard}
+                style={{ background: 'none', border: `1px solid ${T.border2}`, color: T.muted, padding: '10px 18px', fontSize: '11px', fontWeight: 600, letterSpacing: '0.06em', borderRadius: '5px', cursor: 'pointer', fontFamily: FONT_SANS, transition: 'border-color 150ms, color 150ms' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(232,232,232,0.3)'; e.currentTarget.style.color = T.text; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = T.border2; e.currentTarget.style.color = T.muted; }}>
+                Discard changes
+              </button>
+              <button onClick={async () => { await handleSave(); navigateBack(); }}
+                style={{ background: '#e8e8e8', color: '#0d0d0d', border: 'none', padding: '10px 22px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', borderRadius: '5px', cursor: 'pointer', fontFamily: FONT_SANS }}>
+                Save changes
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Background */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden' }}>
@@ -182,7 +154,7 @@ export default function Settings() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <img src={logoMark} alt="Cinova" style={{ height: '24px', display: 'block', opacity: 0.9 }} />
           <button
-            onClick={() => { if (barState === 'dirty') { setBarState('leaving'); } else { navigateBack(); } }}
+            onClick={() => { if (isDirty) { setShowLeaveModal(true); } else { navigateBack(); } }}
             style={{ background: 'none', border: `1px solid ${T.border2}`, padding: '8px 16px', fontSize: '11px', color: T.muted, letterSpacing: '0.06em', borderRadius: '4px', fontWeight: 500, cursor: 'pointer', fontFamily: FONT_SANS, transition: 'border-color 150ms' }}
             onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(232,232,232,0.3)')}
             onMouseLeave={e => (e.currentTarget.style.borderColor = T.border2)}>
@@ -220,7 +192,7 @@ export default function Settings() {
                 {/* Mode tabs */}
                 <div style={{ display: 'flex', background: 'rgba(232,232,232,0.06)', borderRadius: '6px', padding: '3px', gap: '2px' }}>
                   {(['auto', 'custom'] as const).map(mode => (
-                    <button key={mode} onClick={() => { setBgMode(mode); setBarState('dirty'); }}
+                    <button key={mode} onClick={() => { setBgMode(mode); setIsDirty(true); }}
                       style={{
                         background: bgMode === mode ? 'rgba(232,232,232,0.12)' : 'none',
                         border: 'none', borderRadius: '4px',
@@ -244,14 +216,14 @@ export default function Settings() {
                     <input
                       type="text"
                       value={customBg}
-                      onChange={e => { setCustomBg(e.target.value); setBarState('dirty'); }}
+                      onChange={e => { setCustomBg(e.target.value); setIsDirty(true); }}
                       placeholder="Paste an image URL…"
                       style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: `1px solid ${T.border2}`, borderRadius: '5px', padding: '10px 38px 10px 14px', fontSize: '13px', color: T.text, fontFamily: FONT_SANS, outline: 'none', letterSpacing: '0.01em', transition: 'border-color 150ms', boxSizing: 'border-box' }}
                       onFocus={e => (e.currentTarget.style.borderColor = 'rgba(232,232,232,0.3)')}
                       onBlur={e => (e.currentTarget.style.borderColor = T.border2)}
                     />
                     {customBg.trim() && (
-                      <button onClick={() => { setCustomBg(''); setBarState('dirty'); }}
+                      <button onClick={() => { setCustomBg(''); setIsDirty(true); }}
                         style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: '14px', padding: '2px 4px', lineHeight: 1, transition: 'color 150ms' }}
                         onMouseEnter={e => (e.currentTarget.style.color = T.text)}
                         onMouseLeave={e => (e.currentTarget.style.color = T.muted)}>
@@ -272,7 +244,7 @@ export default function Settings() {
                     {BG_URLS.map((url, i) => {
                       const isActive = (selectedBgIndex ?? store.backgroundIndex) === i;
                       return (
-                        <div key={i} onClick={() => { setSelectedBgIndex(i); setBarState('dirty'); }} style={{
+                        <div key={i} onClick={() => { setSelectedBgIndex(i); setIsDirty(true); }} style={{
                           flexShrink: 0, width: '120px', height: '80px', borderRadius: '5px',
                           backgroundImage: `url('${url}')`, backgroundSize: 'cover', backgroundPosition: 'center',
                           border: isActive ? `2px solid ${T.amber}` : `1px solid ${T.border}`,
@@ -313,6 +285,17 @@ export default function Settings() {
 
           </div>
         </div>{/* end grid */}
+
+        {/* Save */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button onClick={handleSave}
+            style={{ padding: '12px 28px', background: T.accent, color: T.accentText, border: 'none', fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', borderRadius: '4px', cursor: 'pointer', fontFamily: FONT_SANS }}>
+            Save changes
+          </button>
+          <span style={{ fontSize: '12px', color: T.muted, opacity: savedVisible ? 1 : 0, transition: 'opacity 0.4s', letterSpacing: '0.06em' }}>
+            ✓ Saved
+          </span>
+        </div>
 
       </div>
     </div>
