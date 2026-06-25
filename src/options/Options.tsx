@@ -8,19 +8,19 @@ function extractUrls(text: string): string[] {
   return m ? [...new Set(m)] : [];
 }
 
-const MAX_GOALS  = 10;
-const FONT_SANS  = "'Space Grotesk', sans-serif";
-const FONT_MONO  = "'Space Mono', monospace";
-const BG_URL     = 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1920&q=80';
+const MAX_GOALS = 10;
+const FONT_SANS = "'Space Grotesk', sans-serif";
+const FONT_MONO = "'Space Mono', monospace";
+const BG_URL = 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1920&q=80';
 
 const T = {
-  text:       '#e8e8e8',
-  muted:      'rgba(232,232,232,0.36)',
-  border:     'rgba(232,232,232,0.07)',
-  border2:    'rgba(232,232,232,0.14)',
-  surface:    'rgba(18,18,18,0.62)',
+  text: '#e8e8e8',
+  muted: 'rgba(232,232,232,0.36)',
+  border: 'rgba(232,232,232,0.07)',
+  border2: 'rgba(232,232,232,0.14)',
+  surface: 'rgba(18,18,18,0.62)',
   surfaceHover: 'rgba(255,255,255,0.04)',
-  accent:     '#e8e8e8',
+  accent: '#e8e8e8',
   accentText: '#0d0d0d',
   cardBorder: 'rgba(232,232,232,0.1)',
   cardBorderFocus: 'rgba(232,232,232,0.24)',
@@ -100,7 +100,7 @@ function GoalCard({
           title={isExpanded ? 'Hide notes' : 'Add notes'}
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', display: 'flex', alignItems: 'center', gap: '4px', color: hasNotes ? T.text : T.muted, opacity: hasNotes ? 0.8 : 0.5, transition: 'opacity 150ms', flexShrink: 0 }}>
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path d="M2 2.5h9M2 5.5h9M2 8.5h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            <path d="M2 2.5h9M2 5.5h9M2 8.5h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
           </svg>
           {hasNotes && !isExpanded && <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: T.text, opacity: 0.6 }} />}
         </button>
@@ -227,11 +227,11 @@ function CategorySection({
 
 // ─── Options Root ─────────────────────────────────────────────────────────────
 export default function Options() {
-  const [store,   setLocalStore] = useState<GoalStore | null>(null);
-  const [weekly,  setWeekly]     = useState<GoalDraft[]>([emptyDraft()]);
-  const [monthly, setMonthly]    = useState<GoalDraft[]>([emptyDraft()]);
-  const [yearly,  setYearly]     = useState<GoalDraft[]>([emptyDraft()]);
-  const [expanded, setExpanded]  = useState<Set<string>>(new Set());
+  const [store, setLocalStore] = useState<GoalStore | null>(null);
+  const [weekly, setWeekly] = useState<GoalDraft[]>([emptyDraft()]);
+  const [monthly, setMonthly] = useState<GoalDraft[]>([emptyDraft()]);
+  const [yearly, setYearly] = useState<GoalDraft[]>([emptyDraft()]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [savedVisible, setSavedVisible] = useState(false);
 
   useEffect(() => {
@@ -239,7 +239,7 @@ export default function Options() {
       setLocalStore(s);
       const w = draftsFromGoals(s.weekly);
       const mo = draftsFromGoals(s.monthly);
-      const y  = draftsFromGoals(s.yearly);
+      const y = draftsFromGoals(s.yearly);
       setWeekly(w); setMonthly(mo); setYearly(y);
       setExpanded(new Set([...w, ...mo, ...y].filter(d => d.description.trim()).map(d => d.id)));
     });
@@ -249,9 +249,9 @@ export default function Options() {
     if (!store) return;
     const newStore: GoalStore = {
       ...store,
-      weekly:  buildGoals(weekly),
+      weekly: buildGoals(weekly),
       monthly: buildGoals(monthly),
-      yearly:  buildGoals(yearly),
+      yearly: buildGoals(yearly),
     };
     await setStore(newStore);
     setLocalStore(newStore);
@@ -275,9 +275,9 @@ export default function Options() {
   }
 
   const sections = [
-    { key: 'weekly'  as const, label: 'This Week',  values: weekly,  setter: setWeekly  },
+    { key: 'weekly' as const, label: 'This Week', values: weekly, setter: setWeekly },
     { key: 'monthly' as const, label: 'This Month', values: monthly, setter: setMonthly },
-    { key: 'yearly'  as const, label: 'This Year',  values: yearly,  setter: setYearly  },
+    { key: 'yearly' as const, label: 'This Year', values: yearly, setter: setYearly },
   ];
 
   return (
@@ -291,18 +291,16 @@ export default function Options() {
       <div style={{ position: 'relative', zIndex: 1, maxWidth: '600px', margin: '0 auto', padding: '52px 40px 80px' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '52px' }}>
-          <div>
-            <img src={logoMark} alt="Cinova" style={{ height: '24px', display: 'block', marginBottom: '14px', opacity: 0.9 }} />
-            <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1 }}>Goals</h1>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <img src={logoMark} alt="Cinova" style={{ height: '24px', display: 'block', opacity: 0.9 }} />
           <button onClick={() => { window.location.href = chrome.runtime.getURL('src/newtab/index.html'); }}
-            style={{ marginTop: '4px', background: 'none', border: `1px solid ${T.border2}`, padding: '8px 16px', fontSize: '11px', color: T.muted, letterSpacing: '0.06em', borderRadius: '4px', fontWeight: 500, cursor: 'pointer', fontFamily: FONT_SANS, transition: 'opacity 150ms, border-color 150ms' }}
+            style={{ background: 'none', border: `1px solid ${T.border2}`, padding: '8px 16px', fontSize: '11px', color: T.muted, letterSpacing: '0.06em', borderRadius: '4px', fontWeight: 500, cursor: 'pointer', fontFamily: FONT_SANS, transition: 'opacity 150ms, border-color 150ms' }}
             onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(232,232,232,0.3)')}
             onMouseLeave={e => (e.currentTarget.style.borderColor = T.border2)}>
             ← Back
           </button>
         </div>
+        <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: '24px' }}>Goals</h1>
 
         {/* Goal sections — vertical stacked */}
         {sections.map(({ key, label, values, setter }) => (

@@ -331,7 +331,7 @@ function Dashboard({ store, onToggleGoal }: {
       <Background />
 
       {/* Header strip */}
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', padding: '18px 56px', borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', padding: '22px 56px 18px 56px', borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
         <img src={logoFull} alt="Cinova" style={{ height: '26px', display: 'block', opacity: 0.92 }} />
       </div>
 
@@ -339,21 +339,18 @@ function Dashboard({ store, onToggleGoal }: {
       <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', minHeight: 0 }}>
 
         {/* Sidebar */}
-        <div style={{ width: '256px', minWidth: '256px', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${T.border}`, background: T.surface }}>
+        <div style={{ position: 'relative', width: '256px', minWidth: '256px', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${T.border}`, background: T.surface }}>
           {/* Sidebar header with edit icon top-right */}
-          <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.border}`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '10px', letterSpacing: '0.3em', textTransform: 'uppercase', fontWeight: 700, color: T.muted }}>Goals</span>
-            <button onClick={() => { window.location.href = chrome.runtime.getURL('src/options/index.html'); }}
-              title="Edit goals"
-              style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: T.muted, display: 'flex', alignItems: 'center', opacity: 0.6, transition: 'opacity 150ms' }}
-              onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-              onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M9.5 2L12 4.5L5.5 11H3V8.5L9.5 2Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M8 3.5L10.5 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
+          <button onClick={() => { window.location.href = chrome.runtime.getURL('src/options/index.html'); }}
+            title="Edit goals"
+            style={{ position: 'absolute', top: '18px', right: '18px', background: 'none', border: 'none', cursor: 'pointer', color: T.muted, display: 'flex', alignItems: 'center', opacity: 0.6, transition: 'opacity 150ms' }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '0.6')}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M9.5 2L12 4.5L5.5 11H3V8.5L9.5 2Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M8 3.5L10.5 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+          </button>
           <div style={{ flex: 1, padding: '20px 20px', overflowY: 'auto', minHeight: 0 }}>
             <SidebarSection label="This Week" goals={store.weekly} onToggle={id => onToggleGoal('weekly', id)} />
             <SidebarSection label="This Month" goals={store.monthly} onToggle={id => onToggleGoal('monthly', id)} />
