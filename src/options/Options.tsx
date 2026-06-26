@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Goal, GoalStore } from '../types';
+import { Goal, GoalStore, Reward } from '../types';
 import { getStore, setStore } from '../utils/storage';
 import logoMark from '/CinovaLogo.png';
 
@@ -224,6 +224,84 @@ function CategorySection({
   );
 }
 
+// ─── Rewards Section ──────────────────────────────────────────────────────────
+function RewardsSection({ rewards, onChange }: { rewards: Reward[]; onChange: (r: Reward[]) => void }) {
+  const [text, setText] = useState('');
+  const [threshold, setThreshold] = useState(80);
+
+  function add() {
+    if (!text.trim()) return;
+    onChange([...rewards, { id: crypto.randomUUID(), text: text.trim(), threshold }]);
+    setText('');
+    setThreshold(80);
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: '12px', color: T.muted, lineHeight: 1.6, marginBottom: '24px' }}>
+        Define personal rewards tied to your weekly goal completion. When you hit the threshold, your reward appears on the new tab dashboard.
+      </div>
+
+      {/* Add reward row */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '11px', color: T.muted, letterSpacing: '0.05em', marginBottom: '5px' }}>Reward</div>
+          <input
+            type="text"
+            value={text}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') add(); }}
+            placeholder="Coffee break, movie night…"
+            style={{ width: '100%', background: 'rgba(18,16,14,0.55)', border: `1px solid rgba(255,255,255,0.09)`, borderRadius: '6px', padding: '11px 14px', fontSize: '14px', color: T.text, fontFamily: FONT_SANS, outline: 'none', boxSizing: 'border-box' as const, transition: 'border-color 180ms' }}
+            onFocus={e => (e.currentTarget.style.borderColor = T.cardBorderFocus)}
+            onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)')}
+          />
+        </div>
+        <div style={{ width: '90px' }}>
+          <div style={{ fontSize: '11px', color: T.muted, letterSpacing: '0.05em', marginBottom: '5px' }}>At %</div>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={threshold}
+            onChange={e => setThreshold(Math.max(1, Math.min(100, Number(e.target.value))))}
+            style={{ width: '100%', background: 'rgba(18,16,14,0.55)', border: `1px solid rgba(255,255,255,0.09)`, borderRadius: '6px', padding: '11px 12px', fontSize: '14px', color: T.text, fontFamily: FONT_SANS, outline: 'none', boxSizing: 'border-box' as const, transition: 'border-color 180ms' }}
+            onFocus={e => (e.currentTarget.style.borderColor = T.cardBorderFocus)}
+            onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)')}
+          />
+        </div>
+        <button
+          onClick={add}
+          style={{ padding: '11px 18px', background: T.accent, color: T.accentText, border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: FONT_SANS, whiteSpace: 'nowrap' as const, letterSpacing: '0.04em' }}>
+          + Add
+        </button>
+      </div>
+
+      {/* Reward list */}
+      {rewards.length === 0 && (
+        <div style={{ fontSize: '13px', color: T.muted, padding: '24px 0', textAlign: 'center' }}>
+          No rewards yet. Add one above.
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {rewards.map(r => (
+          <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 14px', background: 'rgba(18,16,14,0.55)', border: `1px solid rgba(255,255,255,0.09)`, borderRadius: '6px' }}>
+            <div style={{ flex: 1, fontSize: '14px', color: T.text }}>{r.text}</div>
+            <div style={{ fontSize: '12px', color: '#E8A838', fontWeight: 600, whiteSpace: 'nowrap' as const }}>
+              {r.threshold}% weekly
+            </div>
+            <button
+              onClick={() => onChange(rewards.filter(x => x.id !== r.id))}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: '18px', lineHeight: 1, opacity: 0.45, flexShrink: 0, transition: 'opacity 150ms', padding: '2px 4px' }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '0.45')}>×</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Options Root ─────────────────────────────────────────────────────────────
 export default function Options() {
   const [store, setLocalStore] = useState<GoalStore | null>(null);
@@ -234,6 +312,8 @@ export default function Options() {
   const [savedVisible, setSavedVisible] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'goals' | 'rewards'>('goals');
+  const [rewards, setRewards] = useState<Reward[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() =>
     (localStorage.getItem('cinova-options-view') as 'grid' | 'list') ?? 'grid'
   );
@@ -251,6 +331,7 @@ export default function Options() {
       const mo = draftsFromGoals(s.monthly);
       const y = draftsFromGoals(s.yearly);
       setWeekly(w); setMonthly(mo); setYearly(y);
+      setRewards(s.rewards ?? []);
       setExpanded(new Set([...w, ...mo, ...y].filter(d => d.description.trim()).map(d => d.id)));
     });
   }, []);
@@ -262,6 +343,7 @@ export default function Options() {
       weekly: buildGoals(weekly),
       monthly: buildGoals(monthly),
       yearly: buildGoals(yearly),
+      rewards,
     };
     await setStore(newStore);
     setLocalStore(newStore);
@@ -349,23 +431,57 @@ export default function Options() {
             ← Back
           </button>
         </div>
-        <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1, marginBottom: '24px', color: '#ffffff' }}>Goals</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
+          <h1 style={{ margin: 0, fontSize: '26px', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1, color: '#ffffff' }}>
+            {activeTab === 'goals' ? 'Goals' : 'Rewards'}
+          </h1>
+          {/* Tab bar */}
+          <div style={{ display: 'flex', background: 'rgba(232,232,232,0.06)', borderRadius: '6px', padding: '3px', gap: '2px' }}>
+            {(['goals', 'rewards'] as const).map(tab => (
+              <button key={tab} onClick={() => setActiveTab(tab)}
+                style={{
+                  background: activeTab === tab ? 'rgba(232,232,232,0.12)' : 'none',
+                  border: 'none', borderRadius: '4px',
+                  padding: '6px 16px', fontSize: '11px', fontWeight: 600,
+                  color: activeTab === tab ? '#ffffff' : T.muted,
+                  letterSpacing: '0.04em', cursor: 'pointer',
+                  fontFamily: FONT_SANS,
+                  borderBottom: activeTab === tab ? `2px solid #E8A838` : '2px solid transparent',
+                  transition: 'color 150ms, background 150ms',
+                }}>
+                {tab === 'goals' ? 'Goals' : 'Rewards'}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        {/* Goal sections */}
-        {sections.map(({ key, label, values, setter }) => (
-          <CategorySection
-            key={key}
-            label={label}
-            values={values}
-            setter={setter}
-            expanded={expanded}
-            setExpanded={setExpanded}
-            gridCards={viewMode === 'grid'}
+        {/* Goals tab */}
+        {activeTab === 'goals' && (
+          <>
+            {sections.map(({ key, label, values, setter }) => (
+              <CategorySection
+                key={key}
+                label={label}
+                values={values}
+                setter={setter}
+                expanded={expanded}
+                setExpanded={setExpanded}
+                gridCards={viewMode === 'grid'}
+              />
+            ))}
+          </>
+        )}
+
+        {/* Rewards tab */}
+        {activeTab === 'rewards' && (
+          <RewardsSection
+            rewards={rewards}
+            onChange={r => { setRewards(r); setIsDirty(true); }}
           />
-        ))}
+        )}
 
         {/* Divider */}
-        <div style={{ height: '1px', background: T.border, marginBottom: '28px' }} />
+        <div style={{ height: '1px', background: T.border, marginBottom: '28px', marginTop: '8px' }} />
 
         {/* Save */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '52px' }}>

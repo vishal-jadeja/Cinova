@@ -3,7 +3,8 @@
   "name": "Cinova",
   "version": "1.0.0",
   "description": "Weekly, monthly, and yearly goals — confronting you every new tab.",
-  "permissions": ["storage", "alarms"],
+  "permissions": ["storage", "alarms", "notifications", "declarativeNetRequest"],
+  "host_permissions": ["*://*/*"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com"
   },
@@ -18,6 +19,12 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/blockpage/index.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "action": {
     "default_title": "Cinova Goals",
     "default_icon": {

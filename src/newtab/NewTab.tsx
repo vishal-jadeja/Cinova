@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Goal, GoalStore } from '../types';
-import { getStore, setStore } from '../utils/storage';
+import { Goal, GoalStore, PomodoroState, PomodoroSettings, Reward } from '../types';
+import { getStore, setStore, getPomodoroState, setPomodoroState } from '../utils/storage';
 import logoFull from '/CinovaWithTextLogo.png';
 
 interface Draft { id: string; text: string; description: string; }
@@ -290,6 +290,149 @@ function Onboarding({ onComplete }: { onComplete: (patch: Partial<GoalStore>) =>
   );
 }
 
+// ─── Pomodoro ─────────────────────────────────────────────────────────────────
+function playPing() {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.8);
+  } catch { /* ignore */ }
+}
+
+function PomodoroTimer({ settings }: { settings?: PomodoroSettings }) {
+  const workDur = settings?.workDuration ?? 25;
+  const shortBreakDur = settings?.shortBreak ?? 5;
+  const longBreakDur = settings?.longBreak ?? 15;
+  const sessionsBeforeLong = settings?.sessionsBeforeLong ?? 4;
+
+  const [pstate, setPstate] = useState<PomodoroState>({ mode: 'idle', endTime: 0, running: false, sessionsCompleted: 0 });
+  const prevModeRef = useRef<PomodoroState['mode']>('idle');
+  const [remaining, setRemaining] = useState(0);
+
+  useEffect(() => {
+    getPomodoroState().then(s => { setPstate(s); prevModeRef.current = s.mode; });
+    const handler = (changes: { [key: string]: chrome.storage.StorageChange }, area: string) => {
+      if (area !== 'local' || !changes['cinova-pomodoro']) return;
+      const next: PomodoroState = changes['cinova-pomodoro'].newValue;
+      if (!next) return;
+      if (prevModeRef.current !== 'idle' && next.mode !== prevModeRef.current) playPing();
+      prevModeRef.current = next.mode;
+      setPstate(next);
+    };
+    chrome.storage.onChanged.addListener(handler);
+    return () => chrome.storage.onChanged.removeListener(handler);
+  }, []);
+
+  useEffect(() => {
+    if (!pstate.running || pstate.mode === 'idle') { setRemaining(0); return; }
+    function tick() { setRemaining(Math.max(0, pstate.endTime - Date.now())); }
+    tick();
+    const iv = setInterval(tick, 500);
+    return () => clearInterval(iv);
+  }, [pstate]);
+
+  const mins = Math.floor(remaining / 60000);
+  const secs = Math.floor((remaining % 60000) / 1000);
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const timeStr = pstate.mode === 'idle'
+    ? `${pad2(workDur)}:00`
+    : pstate.running
+      ? `${pad2(mins)}:${pad2(secs)}`
+      : `${pad2(Math.floor((pstate.endTime - (pstate.pausedAt ?? pstate.endTime)) / 60000))}:${pad2(Math.floor(((pstate.endTime - (pstate.pausedAt ?? pstate.endTime)) % 60000) / 1000))}`;
+
+  const modeLabel = { idle: 'POMODORO', work: 'WORK', shortBreak: 'SHORT BREAK', longBreak: 'LONG BREAK' }[pstate.mode];
+  const modeColor = pstate.mode === 'work' ? '#E8A838' : pstate.mode === 'idle' ? T.muted : 'rgba(232,232,232,0.6)';
+  const completedInCycle = pstate.sessionsCompleted % sessionsBeforeLong;
+
+  async function start() {
+    const next: PomodoroState = { mode: 'work', endTime: Date.now() + workDur * 60000, running: true, sessionsCompleted: pstate.sessionsCompleted };
+    await setPomodoroState(next);
+    chrome.alarms.create('cinova-pomodoro', { when: next.endTime });
+    prevModeRef.current = 'work';
+    setPstate(next);
+  }
+
+  async function pause() {
+    chrome.alarms.clear('cinova-pomodoro');
+    const next: PomodoroState = { ...pstate, running: false, pausedAt: Date.now() };
+    await setPomodoroState(next);
+    setPstate(next);
+  }
+
+  async function resume() {
+    const pausedRemaining = pstate.endTime - (pstate.pausedAt ?? pstate.endTime);
+    const next: PomodoroState = { ...pstate, running: true, endTime: Date.now() + pausedRemaining, pausedAt: undefined };
+    await setPomodoroState(next);
+    chrome.alarms.create('cinova-pomodoro', { when: next.endTime });
+    setPstate(next);
+  }
+
+  async function reset() {
+    chrome.alarms.clear('cinova-pomodoro');
+    const next: PomodoroState = { mode: 'idle', endTime: 0, running: false, sessionsCompleted: 0 };
+    await setPomodoroState(next);
+    prevModeRef.current = 'idle';
+    setPstate(next);
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginTop: '24px' }}>
+      <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.18em', color: modeColor, fontFamily: FONT_MONO, fontWeight: 700 }}>
+        {modeLabel}
+      </div>
+      <div style={{ fontFamily: FONT_MONO, fontSize: '32px', fontWeight: 400, letterSpacing: '-0.02em', color: pstate.mode === 'idle' ? T.muted : T.text, lineHeight: 1 }}>
+        {timeStr}
+      </div>
+      <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+        {Array.from({ length: sessionsBeforeLong }, (_, i) => (
+          <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: i < completedInCycle ? '#E8A838' : 'rgba(232,232,232,0.15)', transition: 'background 300ms' }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+        {pstate.mode === 'idle' && (
+          <button onClick={start}
+            style={{ padding: '7px 18px', background: 'rgba(232,232,232,0.08)', border: `1px solid ${T.border2}`, borderRadius: '4px', color: T.text, fontSize: '11px', fontWeight: 600, cursor: 'pointer', fontFamily: FONT_SANS, letterSpacing: '0.06em', transition: 'background 150ms' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(232,232,232,0.14)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(232,232,232,0.08)')}>
+            ▶ Start
+          </button>
+        )}
+        {pstate.mode !== 'idle' && pstate.running && (
+          <button onClick={pause}
+            style={{ padding: '7px 18px', background: 'rgba(232,232,232,0.08)', border: `1px solid ${T.border2}`, borderRadius: '4px', color: T.text, fontSize: '11px', fontWeight: 600, cursor: 'pointer', fontFamily: FONT_SANS, letterSpacing: '0.06em', transition: 'background 150ms' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(232,232,232,0.14)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(232,232,232,0.08)')}>
+            ⏸ Pause
+          </button>
+        )}
+        {pstate.mode !== 'idle' && !pstate.running && (
+          <button onClick={resume}
+            style={{ padding: '7px 18px', background: 'rgba(232,232,232,0.08)', border: `1px solid ${T.border2}`, borderRadius: '4px', color: T.text, fontSize: '11px', fontWeight: 600, cursor: 'pointer', fontFamily: FONT_SANS, letterSpacing: '0.06em', transition: 'background 150ms' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(232,232,232,0.14)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(232,232,232,0.08)')}>
+            ▶ Resume
+          </button>
+        )}
+        {pstate.mode !== 'idle' && (
+          <button onClick={reset}
+            style={{ padding: '7px 14px', background: 'none', border: `1px solid rgba(232,232,232,0.08)`, borderRadius: '4px', color: T.muted, fontSize: '11px', fontWeight: 600, cursor: 'pointer', fontFamily: FONT_SANS, letterSpacing: '0.06em', transition: 'all 150ms' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = T.border2; e.currentTarget.style.color = T.text; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(232,232,232,0.08)'; e.currentTarget.style.color = T.muted; }}>
+            ↺ Reset
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 function useTime() {
   const [t, setT] = useState(() => new Date());
@@ -432,6 +575,23 @@ function Dashboard({ store, onToggleGoal }: {
             <SidebarSection label="This Month" goals={store.monthly} onToggle={id => onToggleGoal('monthly', id)} />
             <SidebarSection label="This Year" goals={store.yearly} onToggle={id => onToggleGoal('yearly', id)} />
           </div>
+          {/* Earned rewards */}
+          {(() => {
+            const weeklyGoals = store.weekly.filter(g => g.text.trim());
+            const total = weeklyGoals.length;
+            const pct = total > 0 ? (weeklyGoals.filter(g => g.completed).length / total) * 100 : 0;
+            const earned = (store.rewards ?? []).filter((r: Reward) => r.threshold <= pct);
+            if (earned.length === 0) return null;
+            return (
+              <div style={{ borderTop: `1px solid ${T.border}`, padding: '10px 20px' }}>
+                {earned.map((r: Reward) => (
+                  <div key={r.id} style={{ fontSize: '11px', color: '#E8A838', marginBottom: '4px', opacity: 0.9 }}>
+                    🎁 {r.text}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           {/* Sidebar footer — settings */}
           <div style={{ borderTop: `1px solid ${T.border}`, padding: '10px 12px', display: 'flex', alignItems: 'center' }}>
             <button onClick={() => { window.location.href = chrome.runtime.getURL('src/settings/index.html'); }}
@@ -472,6 +632,7 @@ function Dashboard({ store, onToggleGoal }: {
                 onBlur={() => setSearchFocused(false)}
                 style={{ width: '100%', padding: '13px 16px 13px 40px', background: T.surface, border: `1px solid ${searchFocused ? 'rgba(232,232,232,0.28)' : T.border2}`, fontSize: '14px', color: T.text, borderRadius: '4px', letterSpacing: '0.01em', fontFamily: FONT_SANS, outline: 'none', transition: 'border-color 200ms' }} />
             </form>
+            <PomodoroTimer settings={store.pomodoroSettings} />
           </div>
         </div>
 
